@@ -1,159 +1,182 @@
-// VOD Playlist Addon for Stremio
-const { addonBuilder, serveHTTP } = require("stremio-addon-sdk");
-const express = require("express");
+const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
+const express = require('express');
+const fetch = require('node-fetch');
+const m3u8Parser = require('m3u8-parser');
+const path = require('path');
 
-const PORT = process.env.PORT || 3000;
-const VOD_PLAYLIST_URL = "https://app.rcsfacility.com/1.m3u"; // Your video playlist URL
-
-// Manifest
-const manifest = {
-    id: "org.vodplaylist",
-    version: "1.0.0",
-    name: "SID VOD Playlist",
-    description: "Watch your personal video playlist",
-    resources: ["catalog", "meta", "stream"],
-    types: ["movie"],
-    catalogs: [
-        {
-            type: "SID",
-            id: "vod-playlist",
-            name: "My VOD Playlist",
-            extra: []
-        }
-    ],
-    idPrefixes: ["vod-"],
-    logo: "https://dl.strem.io/addon-logo.png",
-    icon: "https://dl.strem.io/addon-logo.png",
-    background: "https://dl.strem.io/addon-background.jpg",
-    behaviorHints: {
-        configurable: true,
-        configurationRequired: false
-    }
-};
-
-const addon = new addonBuilder(manifest);
-
-const axios = require("axios");
-
-// Helper to parse .m3u playlist
-async function fetchPlaylist(playlistUrl) {
-    try {
-        // Add cache-busting parameter to always fetch the latest playlist
-        const urlWithNoCache = (playlistUrl || VOD_PLAYLIST_URL) + ((playlistUrl || VOD_PLAYLIST_URL).includes('?') ? '&' : '?') + 't=' + Date.now();
-        const res = await axios.get(urlWithNoCache);
-        const lines = res.data.split(/\r?\n/);
-        let metas = [];
-        let currentMeta = {};
-        let idCounter = 1;
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            if (line.startsWith("#EXTINF:")) {
-                const info = line.substring(8).split(",");
-                currentMeta = {
-                    id: `vod-${idCounter}`,
-                    name: info[1] ? info[1].trim() : `Video ${idCounter}`,
-                    type: "movie",
-                    poster: "https://dl.strem.io/addon-logo.png",
-                    background: "https://dl.strem.io/addon-background.jpg",
-                    description: info[1] ? info[1].trim() : `Video ${idCounter}`
-                };
-            } else if (line && !line.startsWith("#")) {
-                if (currentMeta.id) {
-                    currentMeta.url = line;
-                    metas.push(currentMeta);
-                    idCounter++;
-                    currentMeta = {};
-                }
-            }
-        }
-        return metas;
-    } catch (e) {
-        return [];
-    }
-}
-
-// Catalog: List all videos from playlist
-addon.defineCatalogHandler(async (args = {}) => {
-    const playlistUrl = args.extra && args.extra.playlist ? args.extra.playlist : undefined;
-    const metas = await fetchPlaylist(playlistUrl);
-    return { metas };
-});
-
-// Meta: Details about each video
-addon.defineMetaHandler(async ({ id, extra = {} }) => {
-    const playlistUrl = extra.playlist;
-    const metas = await fetchPlaylist(playlistUrl);
-    const meta = metas.find(m => m.id === id);
-    return { meta: meta || {} };
-});
-
-// Stream: Direct link to each video
-addon.defineStreamHandler(async ({ id, extra = {} }) => {
-    const playlistUrl = extra.playlist;
-    const metas = await fetchPlaylist(playlistUrl);
-    const meta = metas.find(m => m.id === id);
-    if (meta && meta.url) {
-        return { streams: [{ url: meta.url, title: meta.name }] };
-    }
-    return { streams: [] }; 
-});
-
-// Express fallback for manifest.json and configure UI
+// Initialize Express
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static('public'));
 
-// Serve the configuration page
+// Store configuration (in-memory; persists until server restart)
+let config = { type: null, url: null, videos: [] };
+
+// Helper to parse M3U
+async function parseM3U(url) {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch M3U');
+    const text = await response.text();
+    const parser = new m3u8Parser.Parser();
+    parser.push(text);
+    parser.end();
+    const manifest = parser.manifest;
+    const videos = manifest.segments.length > 0
+      ? manifest.segments.map((seg, i) => ({
+          id: `m3u:${i}`,
+          title: seg.title || `Video ${i + 1}`,
+          url: seg.uri,
+        }))
+      : manifest.playlists
+        ? manifest.playlists.map((pl, i) => ({
+            id: `m3u:${i}`,
+            title: pl.attributes.NAME || `Stream ${i + 1}`,
+            url: pl.uri,
+          }))
+        : [];
+    return videos;
+  } catch (error) {
+    console.error('M3U Parse Error:', error.message);
+    return [];
+  }
+}
+
+// Define addon
+const builder = new addonBuilder({
+  id: 'org.sidh3369.m3uaddon',
+  version: '1.0.0',
+  name: 'M3U & Direct Video Addon',
+  description: 'Parse M3U playlists or play direct video links in Stremio',
+  resources: ['catalog', 'meta', 'stream'],
+  types: ['movie', 'series'],
+  catalogs: [
+    {
+      type: 'movie',
+      id: 'm3u-videos',
+      name: config.type === 'direct' ? 'Direct Video' : 'M3U Videos',
+    },
+  ],
+});
+
+// Catalog handler
+builder.defineCatalogHandler(async ({ type, id }) => {
+  if (type === 'movie' && id === 'm3u-videos') {
+    if (config.type === 'm3u' && config.url) {
+      const videos = await parseM3U(config.url);
+      config.videos = videos;
+      return {
+        metas: videos.map((video) => ({
+          id: video.id,
+          type: 'movie',
+          name: video.title,
+          poster: 'https://via.placeholder.com/150', // Placeholder image
+        })),
+      };
+    } else if (config.type === 'direct' && config.url) {
+      config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config.url }];
+      return {
+        metas: [
+          {
+            id: 'direct:1',
+            type: 'movie',
+            name: 'Direct Video',
+            poster: 'https://via.placeholder.com/150',
+          },
+        ],
+      };
+    }
+  }
+  return { metas: [] };
+});
+
+// Meta handler
+builder.defineMetaHandler(async ({ type, id }) => {
+  const video = config.videos.find((v) => v.id === id);
+  if (video) {
+    return {
+      meta: {
+        id: video.id,
+        type: 'movie',
+        name: video.title,
+        poster: 'https://via.placeholder.com/150',
+      },
+    };
+  }
+  return { meta: {} };
+});
+
+// Stream handler
+builder.defineStreamHandler(async ({ type, id }) => {
+  const video = config.videos.find((v) => v.id === id);
+  if (video) {
+    return {
+      streams: [{ url: video.url, title: video.title }],
+    };
+  }
+  return { streams: [] };
+});
+
+// Configuration endpoint
 app.get('/configure', (req, res) => {
-    res.send(`
-        <h1>SID VOD Playlist v1.0.0</h1>
-        <p>Watch your personal video playlist</p>
-        <p>This addon has more:</p>
-        <ul>
-            <li>Movies</li>
-            <li>TV Shows</li>
-            <li>Documentaries</li>
-        </ul>
-        <form action="/update-playlist" method="post" enctype="multipart/form-data">
-            <label for="playlist">Enter M3U Link:</label>
-            <input type="text" name="playlist" id="playlist" placeholder="M3U Link">
-            <p>OR</p>
-            <label for="file">Upload M3U File:</label>
-            <input type="file" name="file" id="file" accept=".m3u">
-            <button type="submit">Save</button>
+  res.send(`
+    <html>
+      <body>
+        <h1>Configure M3U or Direct Video Addon</h1>
+        <form action="/configure" method="POST">
+          <label>
+            <input type="radio" name="type" value="m3u" required> M3U Playlist URL
+          </label><br>
+          <label>
+            <input type="radio" name="type" value="direct"> Direct Video URL
+          </label><br>
+          <input type="url" name="url" placeholder="Enter URL" required style="width: 300px;"><br>
+          <button type="submit">Save</button>
         </form>
-    `);
+      </body>
+    </html>
+  `);
 });
 
-// Handle playlist updates
-app.post('/update-playlist', (req, res) => {
-    const playlist = req.body.playlist;
-    // Save the playlist link for later use
-    res.redirect('/');
-});
-app.get("/manifest.json", (req, res) => {
-    res.setHeader("Content-Type", "application/json");
-    res.send(manifest);
-});
-
-// Simple configure page for playlist URL
-app.get("/configure", (req, res) => {
-    res.setHeader("Content-Type", "text/html");
-    res.send(`
-        <html>
-        <head><title>Configure Playlist</title></head>
-        <body>
-            <h2>Configure Playlist URL</h2>
-            <form method="GET" action="/manifest.json">
-                <label for="playlist">Playlist URL (.m3u):</label>
-                <input type="text" id="playlist" name="playlist" value="" style="width:400px" />
-                <button type="submit">Save &amp; Use</button>
-            </form>
-            <p>After submitting, add the addon again in Stremio using the new manifest URL with the playlist parameter.</p>
-        </body>
-        </html>
-    `);
+app.post('/configure', async (req, res) => {
+  const { type, url } = req.body;
+  if (!type || !url) {
+    return res.status(400).send('Type and URL are required');
+  }
+  config.type = type;
+  config.url = url;
+  if (type === 'm3u') {
+    config.videos = await parseM3U(url);
+  } else {
+    config.videos = [{ id: 'direct:1', title: 'Direct Video', url }];
+  }
+  res.send('Configuration saved! Check Stremio catalog.');
 });
 
-// Serve the add-on
-serveHTTP(addon.getInterface(), { server: app, path: "/manifest.json", port: PORT });
+// Dashboard endpoint
+app.get('/dashboard', (req, res) => {
+  const videoList = config.videos
+    .map((v) => `<li>${v.title}: <a href="${v.url}">${v.url}</a></li>`)
+    .join('');
+  res.send(`
+    <html>
+      <body>
+        <h1>M3U/Direct Video Dashboard</h1>
+        <p>Configured: ${config.type || 'None'} - ${config.url || 'No URL'}</p>
+        <h2>Videos</h2>
+        <ul>${videoList || '<li>No videos configured</li>'}</ul>
+        <a href="/configure">Configure Addon</a>
+      </body>
+    </html>
+  `);
+});
+
+// Serve addon
+serveHTTP(builder.getInterface(), { port: process.env.PORT || 7000, app });
+
+// Start server
+const PORT = process.env.PORT || 7000;
+app.listen(PORT, () => {
+  console.log(`Addon running on port ${PORT}`);
+});
