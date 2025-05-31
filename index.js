@@ -1,4 +1,4 @@
-const { addonBuilder } = require('stremio-addon-sdk');
+const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
 const express = require('express');
 const fetch = require('node-fetch');
 const m3u8Parser = require('m3u8-parser');
@@ -80,7 +80,7 @@ async function parseM3U(url) {
 // Define addon
 const builder = new addonBuilder({
   id: 'org.sidh.m3uaddon',
-  version: '1.2.0',
+  version: '1.2.1',
   name: 'M3U & Direct Video Addon',
   description: 'Stremio addon for M3U playlists and direct video links',
   resources: ['catalog', 'meta', 'stream'],
@@ -152,7 +152,7 @@ builder.defineMetaHandler(async ({ type, id }) => {
 
 builder.defineStreamHandler(async ({ type, id }) => {
   console.log(`Stream request: id=${id}`);
-  const video = config.videos.find((vid) => vid.id === id);
+  const video = config.videos.find((v) => v.id === id);
   if (video) {
     return {
       streams: [{ url: video.url, title: video.title }],
@@ -184,9 +184,14 @@ app.get('/', (req, res) => {
             align-items: center;
             margin: 0;
           }
-          h1, h3 { text-shadow: 2px 2px 4px rgba(0,0,0,0.7); }
+          h1, h3 { 
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 5px;
+          }
           form {
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.8);
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
@@ -197,6 +202,8 @@ app.get('/', (req, res) => {
             margin: 10px 0;
             border: none;
             border-radius: 5px;
+            background: #fff;
+            color: #000;
           }
           button {
             padding: 10px 20px;
@@ -205,15 +212,30 @@ app.get('/', (req, res) => {
             border: none;
             border-radius: 5px;
             cursor: pointer;
+            font-weight: bold;
           }
           button:hover { background: #0056b3; }
-          p.error { color: #ff4d4d; }
-          p.success { color: #4dff4d; }
+          p.error { 
+            color: #ff4d4d; 
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+          }
+          p.success { 
+            color: #4dff4d; 
+            background: rgba(0,0,0,0.7);
+            padding: 10px;
+            border-radius: 5px;
+          }
           a {
             color: #4da8ff;
             text-decoration: none;
             margin-top: 10px;
             display: inline-block;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
           }
           a:hover { text-decoration: underline; }
         </style>
@@ -255,9 +277,14 @@ app.post('/validate', async (req, res) => {
               align-items: center;
               margin: 0;
             }
-            h1, h3 { text-shadow: 2px 2px 4px rgba(0,0,0,0.7); }
+            h1, h3 { 
+              text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+              background: rgba(0,0,0,0.7);
+              padding: 10px 20px;
+              border-radius: 5px;
+            }
             form {
-              background: rgba(0,0,0,0.6);
+              background: rgba(0,0,0,0.8);
               padding: 20px;
               border-radius: 10px;
               box-shadow: 0 0 10px rgba(0,0,0,0.5);
@@ -268,6 +295,8 @@ app.post('/validate', async (req, res) => {
               margin: 10px 0;
               border: none;
               border-radius: 5px;
+              background: #fff;
+              color: #000;
             }
             button {
               padding: 10px 20px;
@@ -276,15 +305,30 @@ app.post('/validate', async (req, res) => {
               border: none;
               border-radius: 5px;
               cursor: pointer;
+              font-weight: bold;
             }
             button:hover { background: #0056b3; }
-            p.error { color: #ff4d4d; }
-            p.success { color: #4dff4d; }
+            p.error { 
+              color: #ff4d4d; 
+              background: rgba(0,0,0,0.7);
+              padding: 10px;
+              border-radius: 5px;
+            }
+            p.success { 
+              color: #4dff4d; 
+              background: rgba(0,0,0,0.7);
+              padding: 10px;
+              border-radius: 5px;
+            }
             a {
               color: #4da8ff;
               text-decoration: none;
               margin-top: 10px;
               display: inline-block;
+              background: rgba(0,0,0,0.7);
+              padding: 5px 10px;
+              border-radius: 5px;
+              font-weight: bold;
             }
             a:hover { text-decoration: underline; }
           </style>
@@ -337,9 +381,14 @@ app.post('/validate', async (req, res) => {
               align-items: center;
               margin: 0;
             }
-            h1, h3 { text-shadow: 2px 2px 4px rgba(0,0,0,0.7); }
+            h1, h3 { 
+              text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+              background: rgba(0,0,0,0.7);
+              padding: 10px 20px;
+              border-radius: 5px;
+            }
             form {
-              background: rgba(0,0,0,0.6);
+              background: rgba(0,0,0,0.8);
               padding: 20px;
               border-radius: 10px;
               box-shadow: 0 0 10px rgba(0,0,0,0.5);
@@ -350,6 +399,8 @@ app.post('/validate', async (req, res) => {
               margin: 10px 0;
               border: none;
               border-radius: 5px;
+              background: #fff;
+              color: #000;
             }
             button {
               padding: 10px 20px;
@@ -358,15 +409,30 @@ app.post('/validate', async (req, res) => {
               border: none;
               border-radius: 5px;
               cursor: pointer;
+              font-weight: bold;
             }
             button:hover { background: #0056b3; }
-            p.error { color: #ff4d4d; }
-            p.success { color: #4dff4d; }
+            p.error { 
+              color: #ff4d4d; 
+              background: rgba(0,0,0,0.7);
+              padding: 10px;
+              border-radius: 5px;
+            }
+            p.success { 
+              color: #4dff4d; 
+              background: rgba(0,0,0,0.7);
+              padding: 10px;
+              border-radius: 5px;
+            }
             a {
               color: #4da8ff;
               text-decoration: none;
               margin-top: 10px;
               display: inline-block;
+              background: rgba(0,0,0,0.7);
+              padding: 5px 10px;
+              border-radius: 5px;
+              font-weight: bold;
             }
             a:hover { text-decoration: underline; }
           </style>
@@ -401,9 +467,14 @@ app.post('/validate', async (req, res) => {
               align-items: center;
               margin: 0;
             }
-            h1, h3 { text-shadow: 2px 2px 4px rgba(0,0,0,0.7); }
+            h1, h3 { 
+              text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+              background: rgba(0,0,0,0.7);
+              padding: 10px 20px;
+              border-radius: 5px;
+            }
             form {
-              background: rgba(0,0,0,0.6);
+              background: rgba(0,0,0,0.8);
               padding: 20px;
               border-radius: 10px;
               box-shadow: 0 0 10px rgba(0,0,0,0.5);
@@ -414,6 +485,8 @@ app.post('/validate', async (req, res) => {
               margin: 10px 0;
               border: none;
               border-radius: 5px;
+              background: #fff;
+              color: #000;
             }
             button {
               padding: 10px 20px;
@@ -422,15 +495,30 @@ app.post('/validate', async (req, res) => {
               border: none;
               border-radius: 5px;
               cursor: pointer;
+              font-weight: bold;
             }
             button:hover { background: #0056b3; }
-            p.error { color: #ff4d4d; }
-            p.success { color: #4dff4d; }
+            p.error { 
+              color: #ff4d4d; 
+              background: rgba(0,0,0,0.7);
+              padding: 10px;
+              border-radius: 5px;
+            }
+            p.success { 
+              color: #4dff4d; 
+              background: rgba(0,0,0,0.7);
+              padding: 10px;
+              border-radius: 5px;
+            }
             a {
               color: #4da8ff;
               text-decoration: none;
               margin-top: 10px;
               display: inline-block;
+              background: rgba(0,0,0,0.7);
+              padding: 5px 10px;
+              border-radius: 5px;
+              font-weight: bold;
             }
             a:hover { text-decoration: underline; }
           </style>
@@ -474,9 +562,14 @@ app.get('/dashboard', (req, res) => {
             align-items: center;
             margin: 0;
           }
-          h1, h2 { text-shadow: 2px 2px 4px rgba(0,0,0,0.7); }
+          h1, h2 { 
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 5px;
+          }
           ul {
-            background: rgba(0,0,0,0.6);
+            background: rgba(0,0,0,0.8);
             padding: 20px;
             border-radius: 10px;
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
@@ -487,6 +580,10 @@ app.get('/dashboard', (req, res) => {
           a {
             color: #4da8ff;
             text-decoration: none;
+            background: rgba(0,0,0,0.7);
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-weight: bold;
           }
           a:hover { text-decoration: underline; }
         </style>
@@ -502,50 +599,8 @@ app.get('/dashboard', (req, res) => {
   `);
 });
 
-// Addon routes
-const addonInterface = builder.getInterface();
-app.get('/addon/manifest.json', async (req, res) => {
-  console.log('Serving /addon/manifest.json', req.query);
-  res.set('Access-Control-Allow-Origin', '*');
-  const configUrl = req.query.url || req.query.configUrl;
-  if (configUrl) {
-    const url = decodeURIComponent(configUrl);
-    let result = await validateM3U(url);
-    let type = 'm3u';
-    if (!result.valid) {
-      result = await validateDirect(url);
-      type = 'direct';
-    }
-    if (result.valid) {
-      config.url = url;
-      config.type = type;
-      if (type === 'm3u') {
-        config.videos = await parseM3U(url);
-      } else {
-        config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config.url }];
-      }
-    } else {
-      console.error(`Invalid configUrl: ${url} - ${result.error}`);
-      config.url = null;
-      config.type = null;
-      config.videos = [];
-    }
-  }
-  res.json(addonInterface.manifest);
-});
-
-app.get('/addon/:resource/:type/:id/:extra?.json', async (req, res) => {
-  console.log(`Serving addon route: ${req.path}`);
-  res.set('Access-Control-Allow-Origin', '*');
-  const { resource, type, id } = req.params;
-  try {
-    const response = await addonInterface[resource]({ type, id });
-    res.json(response);
-  } catch (error) {
-    console.error(`Addon error for ${resource}:`, error.message);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
+// Mount addon routes using serveHTTP
+app.use('/addon', serveHTTP(builder.getInterface()));
 
 // Start server
 const PORT = process.env.PORT || 7000;
