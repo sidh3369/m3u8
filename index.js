@@ -6,11 +6,11 @@ const m3u8Parser = require('m3u8-parser');
 // Initialize Express
 const app = express();
 app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.urlencoded({ extended: false }));
 app.use(express.static('public'));
 
 // Store configuration (in-memory; persists until server restart)
-let config = { type: null, url: null, videos: [] };
+const config = { type: null, url: null, videos: [] };
 
 // Helper to parse M3U
 async function parseM3U(url) {
@@ -22,32 +22,33 @@ async function parseM3U(url) {
     parser.push(text);
     parser.end();
     const manifest = parser.manifest;
-    const videos = manifest.segments.length > 0
+    const videos = manifest.segments.length
       ? manifest.segments.map((seg, i) => ({
           id: `m3u:${i + 1}`,
           title: seg.title || `Video ${i + 1}`,
-          url: seg.uri,
+          src: seg.uri,
         }))
       : manifest.playlists
         ? manifest.playlists.map((pl, i) => ({
             id: `m3u:${i + 1}`,
             title: pl.attributes?.NAME || `Stream ${i + 1}`,
-            url: pl.uri,
+            src: pl.uri,
           }))
         : [];
+    console.log(`Parsed ${videos.length} videos from M3U`);
     return videos;
   } catch (error) {
     console.error('M3U Parse Error:', error.message);
     return [];
   }
-}
+};
 
 // Define addon
 const builder = new addonBuilder({
-  id: 'org.sidh3369.studioaddon',
-  version: '1.0.1',
+  id: 'org.sidh.studioaddon',
+  version: '1.1.0',
   name: 'M3U & Direct Video',
-  description: 'Parse M3U playlists or play direct video links in Stremio',
+  description: 'Stremio addon for M3U playlists and direct video links',
   resources: ['catalog', 'meta', 'stream'],
   types: ['movie'],
   catalogs: [
@@ -57,10 +58,15 @@ const builder = new addonBuilder({
       name: config.type === 'direct' ? 'Direct Video' : 'M3U Videos',
     },
   ],
+  behaviorHints: {
+    configurable: true, // Enable configuration prompt
+    configurationRequired: false, // Allow use without config
+  },
 });
 
 // Catalog handler
 builder.defineCatalogHandler(async ({ type, id }) => {
+  console.log(`Catalog request: type=${type}, id=${id}`);
   if (type === 'movie' && id === 'm3u-videos') {
     if (config.type === 'm3u' && config.url) {
       const videos = await parseM3U(config.url);
@@ -70,20 +76,18 @@ builder.defineCatalogHandler(async ({ type, id }) => {
           id: video.id,
           type: 'movie',
           name: video.title,
-          poster: 'https://via.placeholder.com/150', // Placeholder
+          poster: 'https://via.placeholder.com/150',
         })),
       };
     } else if (config.type === 'direct' && config.url) {
       config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config.url }];
       return {
-        metas: [
-          {
-            id: 'direct:1',
-            type: 'movie',
-            name: 'Direct Video',
-            poster: 'https://via.placeholder.com/150',
-          },
-        ],
+        {
+          id: 'direct:1',
+          type: 'movie',
+          name: 'Direct Video',
+          poster: 'https://via.placeholder.com/150',
+        },
       };
     }
   }
@@ -92,6 +96,7 @@ builder.defineCatalogHandler(async ({ type, id }) => {
 
 // Meta handler
 builder.defineMetaHandler(async ({ type, id }) => {
+  console.log('Meta request: ', id);
   const video = config.videos.find((v) => v.id === id);
   if (video) {
     return {
@@ -108,6 +113,7 @@ builder.defineMetaHandler(async ({ type, id }) => {
 
 // Stream handler
 builder.defineStreamHandler(async ({ type, id }) => {
+  console.log('Stream request: ', id);
   const video = config.videos.find((v) => v.id === id);
   if (video) {
     return {
@@ -119,6 +125,7 @@ builder.defineStreamHandler(async ({ type, id }) => {
 
 // Configuration endpoint
 app.get('/configure', (req, res) => {
+  console.log('Serving /configure');
   res.send(`
     <html>
       <body>
@@ -126,11 +133,12 @@ app.get('/configure', (req, res) => {
         <form action="/configure" method="POST">
           <label>
             <input type="radio" name="type" value="m3u" required> M3U Playlist URL
-          </label><br>
+          </label><br />
           <label>
             <input type="radio" name="type" value="direct"> Direct Video URL
-          </label><br>
-          <input type="url" name="url" placeholder="Enter URL" required style="width: 300px;"><br>
+          </label><br />
+          <input type="url" name="url" placeholder="Enter URL" required style="width: 300px;"><br />
+          <br />
           <button type="submit">Save</button>
         </form>
       </body>
@@ -139,6 +147,7 @@ app.get('/configure', (req, res) => {
 });
 
 app.post('/configure', async (req, res) => {
+  console.log('POST /configure:', req.body);
   const { type, url } = req.body;
   if (!type || !url) {
     return res.status(400).send('Type and URL are required');
@@ -150,11 +159,12 @@ app.post('/configure', async (req, res) => {
   } else {
     config.videos = [{ id: 'direct:1', title: 'Direct Video', url }];
   }
-  res.send('Configuration saved! Check Stremio catalog or <a href="/dashboard">Dashboard</a>.');
+  res.send('Configuration saved! Check Stremio or <a href="/dashboard">Dashboard</a>.');
 });
 
 // Dashboard endpoint
 app.get('/dashboard', (req, res) => {
+  console.log('Serving /dashboard');
   const videoList = config.videos
     .map((v) => `<li>${v.title}: <a href="${v.url}">${v.url}</a></li>`)
     .join('');
@@ -171,7 +181,7 @@ app.get('/dashboard', (req, res) => {
   `);
 });
 
-// Start server (use Render's PORT)
+// Start server
 const PORT = process.env.PORT || 7000;
 serveHTTP(builder.getInterface(), { port: PORT, app });
 console.log(`Addon running on port ${PORT}`);
