@@ -80,7 +80,7 @@ async function parseM3U(url) {
 // Define addon
 const builder = new addonBuilder({
   id: 'org.sidh.m3uaddon',
-  version: '1.1.8',
+  version: '1.1.9',
   name: 'M3U & Direct Video Addon',
   description: 'Stremio addon for M3U playlists and direct video links',
   resources: ['catalog', 'meta', 'stream'],
@@ -215,76 +215,8 @@ app.post('/validate', async (req, res) => {
     }
     const encodedUrl = encodeURIComponent(url);
     const manifestUrl = `https://m3u-ce5x.onrender.com/addon/manifest.json?url=${encodedUrl}`;
-    const installUrl = `stremio://${manifestUrl.replace('https://', '')}`;
     res.send(`
       <html>
         <body>
           <h1>Stremio M3U & Direct Video Addon</h1>
-          <p style="color: green;">Link is valid (${type === 'm3u' ? 'M3U Playlist' : 'Direct Video'})!</p>
-          <p>URL: ${url}</p>
-          <a href="${installUrl}">
-            <button>Install in Stremio</button>
-          </a>
-          <p>Or copy this link: <a href="${installUrl}">${installUrl}</a></p>
-          <p>Or use this manifest: <a href="${manifestUrl}">${manifestUrl}</a></p>
-          <br><a href="/dashboard">View Dashboard</a>
-        </body>
-      </html>
-    `);
-  } else {
-    res.send(`
-      <html>
-        <body>
-          <h1>Stremio M3U & Direct Video Addon</h1>
-          <p style="color: red;">Error: Invalid link - ${result.error}</p>
-          <form action="/validate" method="POST">
-            <input type="url" name="url" placeholder="Enter URL" required style="width: 300px;" value="${url}"><br>
-            <button type="submit">Validate Link</button>
-          </form>
-        </body>
-      </html>
-    `);
-  }
-});
-
-// Dashboard endpoint
-app.get('/dashboard', (req, res) => {
-  console.log('Serving /dashboard');
-  res.set('Access-Control-Allow-Origin', '*');
-  const videoList = config.videos
-    .map((v) => `<li>${v.title}: <a href="${v.url}">${v.url}</a></li>`)
-    .join('');
-  res.send(`
-    <html>
-      <body>
-        <h1>M3U/Direct Video Dashboard</h1>
-        <p>Configured: ${config.type || 'None'} - ${config.url || 'No URL'}</p>
-        <h2>Videos</h2>
-        <ul>${videoList || '<li>No videos configured</li>'}</ul>
-        <a href="/">Back to Home</a>
-      </body>
-    </html>
-  `);
-});
-
-// Addon routes
-const addonInterface = builder.getInterface();
-app.get('/addon/manifest.json', async (req, res) => {
-  console.log('Serving /addon/manifest.json', req.query);
-  res.set('Access-Control-Allow-Origin', '*');
-  const configUrl = req.query.url || req.query.configUrl;
-  if (configUrl) {
-    const url = decodeURIComponent(configUrl);
-    let result = await validateM3U(url);
-    let type = 'm3u';
-    if (!result.valid) {
-      result = await validateDirect(url);
-      type = 'direct';
-    }
-    if (result.valid) {
-      config.url = url;
-      config.type = type;
-      if (type === 'm3u') {
-        config.videos = await parseM3U(url);
-      } else {
-        config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config
+          <p style="color:
