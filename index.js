@@ -35,7 +35,7 @@ async function parseM3U(url) {
             url: pl.uri,
           }))
         : [];
-    console.log(`Parsed ${videos.length} videos from M3U`);
+    console.log(`Parsed ${videos.length} videos from ${url}`);
     return videos;
   } catch (error) {
     console.error('M3U Parse Error:', error.message);
@@ -45,9 +45,9 @@ async function parseM3U(url) {
 
 // Define addon
 const builder = new addonBuilder({
-  id: 'org.sidh3369.studioaddon',
-  version: '1.1.0',
-  name: 'M3U & Direct Video',
+  id: 'org.sidh.m3uaddon',
+  version: '1.1.2',
+  name: 'M3U & Direct Video Addon',
   description: 'Stremio addon for M3U playlists and direct video links',
   resources: ['catalog', 'meta', 'stream'],
   types: ['movie'],
@@ -60,8 +60,71 @@ const builder = new addonBuilder({
   ],
   behaviorHints: {
     configurable: true,
-    configurationRequired: false,
+    configurationRequired: true,
   },
+});
+
+// Root route to test server
+app.get('/', (req, res) => {
+  console.log('Serving /');
+  res.send('Stremio M3U Addon is running. Visit /configure to set up.');
+});
+
+// Configuration endpoint
+app.get('/configure', (req, res) => {
+  console.log('Serving /configure');
+  res.send(`
+    <html>
+      <body>
+        <h1>Configure M3U or Direct Video Addon</h1>
+        <form action="/configure" method="POST">
+          <label>
+            <input type="radio" name="type" value="m3u" required> M3U Playlist URL
+          </label><br>
+          <label>
+            <input type="radio" name="type" value="direct"> Direct Video URL
+          </label><br>
+          <input type="url" name="url" placeholder="Enter URL" required style="width: 300px;"><br>
+          <button type="submit">Save</button>
+        </form>
+      </body>
+    </html>
+  `);
+});
+
+app.post('/configure', async (req, res) => {
+  console.log('POST /configure:', req.body);
+  const { type, url } = req.body;
+  if (!type || !url) {
+    return res.status(400).send('Type and URL are required');
+  }
+  config.type = type;
+  config.url = url;
+  if (type === 'm3u') {
+    config.videos = await parseM3U(url);
+  } else {
+    config.videos = [{ id: 'direct:1', title: 'Direct Video', url }];
+  }
+  res.send('Configuration saved! Check Stremio or <a href="/dashboard">Dashboard</a>.');
+});
+
+// Dashboard endpoint
+app.get('/dashboard', (req, res) => {
+  console.log('Serving /dashboard');
+  const videoList = config.videos
+    .map((v) => `<li>${v.title}: <a href="${v.url}">${v.url}</a></li>`)
+    .join('');
+  res.send(`
+    <html>
+      <body>
+        <h1>M3U/Direct Video Dashboard</h1>
+        <p>Configured: ${config.type || 'None'} - ${config.url || 'No URL'}</p>
+        <h2>Videos</h2>
+        <ul>${videoList || '<li>No videos configured</li>'}</ul>
+        <a href="/configure">Configure Addon</a>
+      </body>
+    </html>
+  `);
 });
 
 // Catalog handler
@@ -123,63 +186,6 @@ builder.defineStreamHandler(async ({ type, id }) => {
     };
   }
   return { streams: [] };
-});
-
-// Configuration endpoint
-app.get('/configure', (req, res) => {
-  console.log('Serving /configure');
-  res.send(`
-    <html>
-      <body>
-        <h1>Configure M3U or Direct Video Addon</h1>
-        <form action="/configure" method="POST">
-          <label>
-            <input type="radio" name="type" value="m3u" required> M3U Playlist URL
-          </label><br>
-          <label>
-            <input type="radio" name="type" value="direct"> Direct Video URL
-          </label><br>
-          <input type="url" name="url" placeholder="Enter URL" required style="width: 300px;"><br>
-          <button type="submit">Save</button>
-        </form>
-      </body>
-    </html>
-  `);
-});
-
-app.post('/configure', async (req, res) => {
-  console.log('POST /configure:', req.body);
-  const { type, url } = req.body;
-  if (!type || !url) {
-    return res.status(400).send('Type and URL are required');
-  }
-  config.type = type;
-  config.url = url;
-  if (type === 'm3u') {
-    config.videos = await parseM3U(url);
-  } else {
-    config.videos = [{ id: 'direct:1', title: 'Direct Video', url }];
-  }
-  res.send('Configuration saved! Check Stremio or <a href="/dashboard">Dashboard</a>.');
-});
-
-// Dashboard endpoint
-app.get('/dashboard', (req, res) => {
-  console.log('Serving /dashboard');
-  const videoList = config.videos
-    .map((v) => `<li>${v.title}: <a href="${v.url}">${v.url}</a></li>`)
-    .join('');
-  res.send(`
-    <html>
-      <body>
-        <h1>M3U/Direct Video Dashboard</h1>
-        <p>Configured: ${config.type || 'None'} - ${config.url || 'No URL'}</p>
-        <h2>Videos</h2>
-        <ul>${videoList || '<li>No videos configured</li>'}</ul>
-        <a href="/configure">Configure Addon</a>
-      </body>
-    </html>
-  `);
 });
 
 // Start server
