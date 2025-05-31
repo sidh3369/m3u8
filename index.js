@@ -80,7 +80,7 @@ async function parseM3U(url) {
 // Define addon
 const builder = new addonBuilder({
   id: 'org.sidh.m3uaddon',
-  version: '1.1.5',
+  version: '1.1.6',
   name: 'M3U & Direct Video Addon',
   description: 'Stremio addon for M3U playlists and direct video links',
   resources: ['catalog', 'meta', 'stream'],
@@ -93,12 +93,12 @@ const builder = new addonBuilder({
     },
   ],
   behaviorHints: {
-    configurable: true,
-    configurationRequired: true,
+    configurable: false,
+    configurationRequired: false,
   },
 });
 
-// Define handlers before getInterface
+// Define handlers
 builder.defineCatalogHandler(async ({ type, id }) => {
   console.log(`Catalog request: type=${type}, id=${id}`);
   if (type === 'movie' && id === 'm3u-videos') {
@@ -259,18 +259,27 @@ app.get('/dashboard', (req, res) => {
 
 // Addon routes
 const addonInterface = builder.getInterface();
-app.get('/addon/manifest.json', (req, res) => {
-  console.log('Serving /addon/manifest.json');
-  const configUrl = req.query.configUrl;
+app.get('/addon/manifest.json', async (req, res) => {
+  console.log('Serving /addon/manifest.json', req.query);
+  const configUrl = req.query.url || req.query.configUrl;
   if (configUrl) {
-    config.url = decodeURIComponent(configUrl);
-    config.type = config.url.includes('.m3u') ? 'm3u' : 'direct';
-    if (config.type === 'm3u') {
-      parseM3U(config.url).then((videos) => {
-        config.videos = videos;
-      });
+    const url = decodeURIComponent(configUrl);
+    let result = await validateM3U(url);
+    let type = 'm3u';
+    if (!result.valid) {
+      result = await validateDirect(url);
+      type = 'direct';
+    }
+    if (result.valid) {
+      config.url = url;
+      config.type = type;
+      if (type === 'm3u') {
+        config.videos = await parseM3U(url);
+      } else {
+        config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config.url }];
+      }
     } else {
-      config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config.url }];
+      console.error(`Invalid configUrl: ${url} - ${result.error}`);
     }
   }
   res.json(addonInterface.manifest);
