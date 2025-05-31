@@ -80,7 +80,7 @@ async function parseM3U(url) {
 // Define addon
 const builder = new addonBuilder({
   id: 'org.sidh.m3uaddon',
-  version: '1.1.4',
+  version: '1.1.5',
   name: 'M3U & Direct Video Addon',
   description: 'Stremio addon for M3U playlists and direct video links',
   resources: ['catalog', 'meta', 'stream'],
@@ -96,6 +96,65 @@ const builder = new addonBuilder({
     configurable: true,
     configurationRequired: true,
   },
+});
+
+// Define handlers before getInterface
+builder.defineCatalogHandler(async ({ type, id }) => {
+  console.log(`Catalog request: type=${type}, id=${id}`);
+  if (type === 'movie' && id === 'm3u-videos') {
+    if (config.type === 'm3u' && config.url) {
+      const videos = await parseM3U(config.url);
+      config.videos = videos;
+      return {
+        metas: videos.map((video) => ({
+          id: video.id,
+          type: 'movie',
+          name: video.title,
+          poster: 'https://via.placeholder.com/150',
+        })),
+      };
+    } else if (config.type === 'direct' && config.url) {
+      config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config.url }];
+      return {
+        metas: [
+          {
+            id: 'direct:1',
+            type: 'movie',
+            name: 'Direct Video',
+            poster: 'https://via.placeholder.com/150',
+          },
+        ],
+      };
+    }
+  }
+  return { metas: [] };
+});
+
+builder.defineMetaHandler(async ({ type, id }) => {
+  console.log(`Meta request: id=${id}`);
+  const video = config.videos.find((v) => v.id === id);
+  if (video) {
+    return {
+      meta: {
+        id: video.id,
+        type: 'movie',
+        name: video.title,
+        poster: 'https://via.placeholder.com/150',
+      },
+    };
+  }
+  return { meta: {} };
+});
+
+builder.defineStreamHandler(async ({ type, id }) => {
+  console.log(`Stream request: id=${id}`);
+  const video = config.videos.find((v) => v.id === id);
+  if (video) {
+    return {
+      streams: [{ url: video.url, title: video.title }],
+    };
+  }
+  return { streams: [] };
 });
 
 // Homepage with link paste
@@ -134,11 +193,9 @@ app.post('/validate', async (req, res) => {
     `);
   }
 
-  // Try M3U first
   let result = await validateM3U(url);
   let type = 'm3u';
   if (!result.valid) {
-    // Try direct video
     result = await validateDirect(url);
     type = 'direct';
   }
@@ -229,67 +286,6 @@ app.get('/addon/:resource/:type/:id/:extra?.json', async (req, res) => {
     console.error(`Addon error for ${resource}:`, error.message);
     res.status(500).json({ error: 'Internal server error' });
   }
-});
-
-// Catalog handler
-builder.defineCatalogHandler(async ({ type, id }) => {
-  console.log(`Catalog request: type=${type}, id=${id}`);
-  if (type === 'movie' && id === 'm3u-videos') {
-    if (config.type === 'm3u' && config.url) {
-      const videos = await parseM3U(config.url);
-      config.videos = videos;
-      return {
-        metas: videos.map((video) => ({
-          id: video.id,
-          type: 'movie',
-          name: video.title,
-          poster: 'https://via.placeholder.com/150',
-        })),
-      };
-    } else if (config.type === 'direct' && config.url) {
-      config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config.url }];
-      return {
-        metas: [
-          {
-            id: 'direct:1',
-            type: 'movie',
-            name: 'Direct Video',
-            poster: 'https://via.placeholder.com/150',
-          },
-        ],
-      };
-    }
-  }
-  return { metas: [] };
-});
-
-// Meta handler
-builder.defineMetaHandler(async ({ type, id }) => {
-  console.log(`Meta request: id=${id}`);
-  const video = config.videos.find((v) => v.id === id);
-  if (video) {
-    return {
-      meta: {
-        id: video.id,
-        type: 'movie',
-        name: video.title,
-        poster: 'https://via.placeholder.com/150',
-      },
-    };
-  }
-  return { meta: {} };
-});
-
-// Stream handler
-builder.defineStreamHandler(async ({ type, id }) => {
-  console.log(`Stream request: id=${id}`);
-  const video = config.videos.find((v) => v.id === id);
-  if (video) {
-    return {
-      streams: [{ url: video.url, title: video.title }],
-    };
-  }
-  return { streams: [] };
 });
 
 // Start server
