@@ -80,7 +80,7 @@ async function parseM3U(url) {
 // Define addon
 const builder = new addonBuilder({
   id: 'org.sidh.m3uaddon',
-  version: '1.1.6',
+  version: '1.1.7',
   name: 'M3U & Direct Video Addon',
   description: 'Stremio addon for M3U playlists and direct video links',
   resources: ['catalog', 'meta', 'stream'],
@@ -102,7 +102,10 @@ const builder = new addonBuilder({
 builder.defineCatalogHandler(async ({ type, id }) => {
   console.log(`Catalog request: type=${type}, id=${id}`);
   if (type === 'movie' && id === 'm3u-videos') {
-    if (config.type === 'm3u' && config.url) {
+    if (!config.url) {
+      return { metas: [] };
+    }
+    if (config.type === 'm3u') {
       const videos = await parseM3U(config.url);
       config.videos = videos;
       return {
@@ -113,7 +116,7 @@ builder.defineCatalogHandler(async ({ type, id }) => {
           poster: 'https://via.placeholder.com/150',
         })),
       };
-    } else if (config.type === 'direct' && config.url) {
+    } else if (config.type === 'direct') {
       config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config.url }];
       return {
         metas: [
@@ -209,15 +212,17 @@ app.post('/validate', async (req, res) => {
       config.videos = [{ id: 'direct:1', title: 'Direct Video', url }];
     }
     const encodedUrl = encodeURIComponent(url);
+    const installUrl = `stremio://m3u-ce5x.onrender.com/addon/manifest.json?url=${encodedUrl}`;
     res.send(`
       <html>
         <body>
           <h1>Stremio M3U & Direct Video Addon</h1>
           <p style="color: green;">Link is valid (${type === 'm3u' ? 'M3U Playlist' : 'Direct Video'})!</p>
           <p>URL: ${url}</p>
-          <a href="/addon/manifest.json?configUrl=${encodedUrl}">
+          <a href="${installUrl}">
             <button>Install in Stremio</button>
           </a>
+          <p>Or copy this link: <a href="${installUrl}">${installUrl}</a></p>
           <br><a href="/dashboard">View Dashboard</a>
         </body>
       </html>
@@ -280,6 +285,9 @@ app.get('/addon/manifest.json', async (req, res) => {
       }
     } else {
       console.error(`Invalid configUrl: ${url} - ${result.error}`);
+      config.url = null;
+      config.type = null;
+      config.videos = [];
     }
   }
   res.json(addonInterface.manifest);
