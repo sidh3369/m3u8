@@ -80,7 +80,7 @@ async function parseM3U(url) {
 // Define addon
 const builder = new addonBuilder({
   id: 'org.sidh.m3uaddon',
-  version: '1.1.7',
+  version: '1.1.8',
   name: 'M3U & Direct Video Addon',
   description: 'Stremio addon for M3U playlists and direct video links',
   resources: ['catalog', 'meta', 'stream'],
@@ -163,6 +163,7 @@ builder.defineStreamHandler(async ({ type, id }) => {
 // Homepage with link paste
 app.get('/', (req, res) => {
   console.log('Serving /');
+  res.set('Access-Control-Allow-Origin', '*');
   res.send(`
     <html>
       <body>
@@ -180,6 +181,7 @@ app.get('/', (req, res) => {
 // Validate link endpoint
 app.post('/validate', async (req, res) => {
   console.log('POST /validate:', req.body);
+  res.set('Access-Control-Allow-Origin', '*');
   const { url } = req.body;
   if (!url) {
     return res.send(`
@@ -212,7 +214,8 @@ app.post('/validate', async (req, res) => {
       config.videos = [{ id: 'direct:1', title: 'Direct Video', url }];
     }
     const encodedUrl = encodeURIComponent(url);
-    const installUrl = `stremio://m3u-ce5x.onrender.com/addon/manifest.json?url=${encodedUrl}`;
+    const manifestUrl = `https://m3u-ce5x.onrender.com/addon/manifest.json?url=${encodedUrl}`;
+    const installUrl = `stremio://${manifestUrl.replace('https://', '')}`;
     res.send(`
       <html>
         <body>
@@ -223,6 +226,7 @@ app.post('/validate', async (req, res) => {
             <button>Install in Stremio</button>
           </a>
           <p>Or copy this link: <a href="${installUrl}">${installUrl}</a></p>
+          <p>Or use this manifest: <a href="${manifestUrl}">${manifestUrl}</a></p>
           <br><a href="/dashboard">View Dashboard</a>
         </body>
       </html>
@@ -246,6 +250,7 @@ app.post('/validate', async (req, res) => {
 // Dashboard endpoint
 app.get('/dashboard', (req, res) => {
   console.log('Serving /dashboard');
+  res.set('Access-Control-Allow-Origin', '*');
   const videoList = config.videos
     .map((v) => `<li>${v.title}: <a href="${v.url}">${v.url}</a></li>`)
     .join('');
@@ -266,6 +271,7 @@ app.get('/dashboard', (req, res) => {
 const addonInterface = builder.getInterface();
 app.get('/addon/manifest.json', async (req, res) => {
   console.log('Serving /addon/manifest.json', req.query);
+  res.set('Access-Control-Allow-Origin', '*');
   const configUrl = req.query.url || req.query.configUrl;
   if (configUrl) {
     const url = decodeURIComponent(configUrl);
@@ -281,35 +287,4 @@ app.get('/addon/manifest.json', async (req, res) => {
       if (type === 'm3u') {
         config.videos = await parseM3U(url);
       } else {
-        config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config.url }];
-      }
-    } else {
-      console.error(`Invalid configUrl: ${url} - ${result.error}`);
-      config.url = null;
-      config.type = null;
-      config.videos = [];
-    }
-  }
-  res.json(addonInterface.manifest);
-});
-
-app.get('/addon/:resource/:type/:id/:extra?.json', async (req, res) => {
-  console.log(`Serving addon route: ${req.path}`);
-  const { resource, type, id } = req.params;
-  try {
-    const response = await addonInterface[resource]({ type, id });
-    res.json(response);
-  } catch (error) {
-    console.error(`Addon error for ${resource}:`, error.message);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Start server
-const PORT = process.env.PORT || 7000;
-app.listen(PORT, () => {
-  console.log(`Addon server running on port ${PORT}`);
-  console.log(`Access home: http://localhost:${PORT}/`);
-  console.log(`Access dashboard: http://localhost:${PORT}/dashboard`);
-  console.log(`Install in Stremio: http://localhost:${PORT}/addon/manifest.json`);
-});
+        config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config
