@@ -2,7 +2,6 @@ const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
 const express = require('express');
 const fetch = require('node-fetch');
 const m3u8Parser = require('m3u8-parser');
-const path = require('path');
 
 // Initialize Express
 const app = express();
@@ -25,14 +24,14 @@ async function parseM3U(url) {
     const manifest = parser.manifest;
     const videos = manifest.segments.length > 0
       ? manifest.segments.map((seg, i) => ({
-          id: `m3u:${i}`,
+          id: `m3u:${i + 1}`,
           title: seg.title || `Video ${i + 1}`,
           url: seg.uri,
         }))
       : manifest.playlists
         ? manifest.playlists.map((pl, i) => ({
-            id: `m3u:${i}`,
-            title: pl.attributes.NAME || `Stream ${i + 1}`,
+            id: `m3u:${i + 1}`,
+            title: pl.attributes?.NAME || `Stream ${i + 1}`,
             url: pl.uri,
           }))
         : [];
@@ -45,12 +44,12 @@ async function parseM3U(url) {
 
 // Define addon
 const builder = new addonBuilder({
-  id: 'org.sidh3369.m3uaddon',
-  version: '1.0.0',
-  name: 'M3U & Direct Video Addon',
+  id: 'org.sidh3369.studioaddon',
+  version: '1.0.1',
+  name: 'M3U & Direct Video',
   description: 'Parse M3U playlists or play direct video links in Stremio',
   resources: ['catalog', 'meta', 'stream'],
-  types: ['movie', 'series'],
+  types: ['movie'],
   catalogs: [
     {
       type: 'movie',
@@ -71,7 +70,7 @@ builder.defineCatalogHandler(async ({ type, id }) => {
           id: video.id,
           type: 'movie',
           name: video.title,
-          poster: 'https://via.placeholder.com/150', // Placeholder image
+          poster: 'https://via.placeholder.com/150', // Placeholder
         })),
       };
     } else if (config.type === 'direct' && config.url) {
@@ -151,7 +150,7 @@ app.post('/configure', async (req, res) => {
   } else {
     config.videos = [{ id: 'direct:1', title: 'Direct Video', url }];
   }
-  res.send('Configuration saved! Check Stremio catalog.');
+  res.send('Configuration saved! Check Stremio catalog or <a href="/dashboard">Dashboard</a>.');
 });
 
 // Dashboard endpoint
@@ -172,11 +171,7 @@ app.get('/dashboard', (req, res) => {
   `);
 });
 
-// Serve addon
-serveHTTP(builder.getInterface(), { port: process.env.PORT || 7000, app });
-
-// Start server
+// Start server (use Render's PORT)
 const PORT = process.env.PORT || 7000;
-app.listen(PORT, () => {
-  console.log(`Addon running on port ${PORT}`);
-});
+serveHTTP(builder.getInterface(), { port: PORT, app });
+console.log(`Addon running on port ${PORT}`);
