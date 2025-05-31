@@ -1,4 +1,4 @@
-const { addonBuilder, serveHTTP } = require('stremio-addon-sdk');
+const { addonBuilder } = require('stremio-addon-sdk');
 const express = require('express');
 const fetch = require('node-fetch');
 const m3u8Parser = require('m3u8-parser');
@@ -9,14 +9,14 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// Store configuration (in-memory; persists until server restart)
+// Store configuration (in-memory)
 let config = { type: null, url: null, videos: [] };
 
 // Helper to parse M3U
 async function parseM3U(url) {
   try {
     const response = await fetch(url);
-    if (!response.ok) throw new Error('Failed to fetch M3U');
+    if (!response.ok) throw new Error(`Failed to fetch M3U: ${response.status}`);
     const text = await response.text();
     const parser = new m3u8Parser.Parser();
     parser.push(text);
@@ -46,7 +46,7 @@ async function parseM3U(url) {
 // Define addon
 const builder = new addonBuilder({
   id: 'org.sidh.m3uaddon',
-  version: '1.1.2',
+  version: '1.1.3',
   name: 'M3U & Direct Video Addon',
   description: 'Stremio addon for M3U playlists and direct video links',
   resources: ['catalog', 'meta', 'stream'],
@@ -62,69 +62,6 @@ const builder = new addonBuilder({
     configurable: true,
     configurationRequired: true,
   },
-});
-
-// Root route to test server
-app.get('/', (req, res) => {
-  console.log('Serving /');
-  res.send('Stremio M3U Addon is running. Visit /configure to set up.');
-});
-
-// Configuration endpoint
-app.get('/configure', (req, res) => {
-  console.log('Serving /configure');
-  res.send(`
-    <html>
-      <body>
-        <h1>Configure M3U or Direct Video Addon</h1>
-        <form action="/configure" method="POST">
-          <label>
-            <input type="radio" name="type" value="m3u" required> M3U Playlist URL
-          </label><br>
-          <label>
-            <input type="radio" name="type" value="direct"> Direct Video URL
-          </label><br>
-          <input type="url" name="url" placeholder="Enter URL" required style="width: 300px;"><br>
-          <button type="submit">Save</button>
-        </form>
-      </body>
-    </html>
-  `);
-});
-
-app.post('/configure', async (req, res) => {
-  console.log('POST /configure:', req.body);
-  const { type, url } = req.body;
-  if (!type || !url) {
-    return res.status(400).send('Type and URL are required');
-  }
-  config.type = type;
-  config.url = url;
-  if (type === 'm3u') {
-    config.videos = await parseM3U(url);
-  } else {
-    config.videos = [{ id: 'direct:1', title: 'Direct Video', url }];
-  }
-  res.send('Configuration saved! Check Stremio or <a href="/dashboard">Dashboard</a>.');
-});
-
-// Dashboard endpoint
-app.get('/dashboard', (req, res) => {
-  console.log('Serving /dashboard');
-  const videoList = config.videos
-    .map((v) => `<li>${v.title}: <a href="${v.url}">${v.url}</a></li>`)
-    .join('');
-  res.send(`
-    <html>
-      <body>
-        <h1>M3U/Direct Video Dashboard</h1>
-        <p>Configured: ${config.type || 'None'} - ${config.url || 'No URL'}</p>
-        <h2>Videos</h2>
-        <ul>${videoList || '<li>No videos configured</li>'}</ul>
-        <a href="/configure">Configure Addon</a>
-      </body>
-    </html>
-  `);
 });
 
 // Catalog handler
@@ -188,7 +125,93 @@ builder.defineStreamHandler(async ({ type, id }) => {
   return { streams: [] };
 });
 
+// Root route to test server
+app.get('/', (req, res) => {
+  console.log('Serving /');
+  res.send('Stremio M3U Addon is running. Visit /configure to set up or /dashboard to view videos.');
+});
+
+// Configuration endpoint
+app.get('/configure', (req, res) => {
+  console.log('Serving /configure');
+  res.send(`
+    <html>
+      <body>
+        <h1>Configure M3U or Direct Video Addon</h1>
+        <form action="/configure" method="POST">
+          <label>
+            <input type="radio" name="type" value="m3u" required> M3U Playlist URL
+          </label><br>
+          <label>
+            <input type="radio" name="type" value="direct"> Direct Video URL
+          </label><br>
+          <input type="url" name="url" placeholder="Enter URL" required style="width: 300px;"><br>
+          <button type="submit">Save</button>
+        </form>
+      </body>
+    </html>
+  `);
+});
+
+app.post('/configure', async (req, res) => {
+  console.log('POST /configure:', req.body);
+  const { type, url } = req.body;
+  if (!type || !url) {
+    return res.status(400).send('Type and URL are required');
+  }
+  config.type = type;
+  config.url = url;
+  if (type === 'm3u') {
+    config.videos = await parseM3U(url);
+  } else {
+    config.videos = [{ id: 'direct:1', title: 'Direct Video', url }];
+  }
+  res.send('Configuration saved! Check Stremio or <a href="/dashboard">Dashboard</a>.');
+});
+
+// Dashboard endpoint
+app.get('/dashboard', (req, res) => {
+  console.log('Serving /dashboard');
+  const videoList = config.videos
+    .map((v) => `<li>${v.title}: <a href="${v.url}">${v.url}</a></li>`)
+    .join('');
+  res.send(`
+    <html>
+      <body>
+        <h1>M3U/Direct Video Dashboard</h1>
+        <p>Configured: ${config.type || 'None'} - ${config.url || 'No URL'}</p>
+        <h2>Videos</h2>
+        <ul>${videoList || '<li>No videos configured</li>'}</ul>
+        <a href="/configure">Configure Addon</a>
+      </body>
+    </html>
+  `);
+});
+
+// Mount addon routes on /addon
+const addonInterface = builder.getInterface();
+app.get('/addon/manifest.json', (req, res) => {
+  console.log('Serving /addon/manifest.json');
+  res.json(addonInterface.manifest);
+});
+
+app.get('/addon/:resource/:type/:id/:extra?.json', async (req, res) => {
+  console.log(`Serving addon route: ${req.path}`);
+  const { resource, type, id } = req.params;
+  try {
+    const response = await addonInterface[resource]({ type, id });
+    res.json(response);
+  } catch (error) {
+    console.error(`Addon error for ${resource}:`, error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Start server
 const PORT = process.env.PORT || 7000;
-serveHTTP(builder.getInterface(), { port: PORT, app });
-console.log(`Addon running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Addon server running on port ${PORT}`);
+  console.log(`Access configure: http://localhost:${PORT}/configure`);
+  console.log(`Access dashboard: http://localhost:${PORT}/dashboard`);
+  console.log(`Install in Stremio: http://localhost:${PORT}/addon/manifest.json`);
+});
