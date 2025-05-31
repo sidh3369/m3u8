@@ -80,7 +80,7 @@ async function parseM3U(url) {
 // Define addon
 const builder = new addonBuilder({
   id: 'org.sidh.m3uaddon',
-  version: '1.1.9',
+  version: '1.2.0',
   name: 'M3U & Direct Video Addon',
   description: 'Stremio addon for M3U playlists and direct video links',
   resources: ['catalog', 'meta', 'stream'],
@@ -96,6 +96,7 @@ const builder = new addonBuilder({
     configurable: false,
     configurationRequired: false,
   },
+  background: 'https://raw.githubusercontent.com/sidh3369/m3u8/main/background.jpg',
 });
 
 // Define handlers
@@ -151,7 +152,7 @@ builder.defineMetaHandler(async ({ type, id }) => {
 
 builder.defineStreamHandler(async ({ type, id }) => {
   console.log(`Stream request: id=${id}`);
-  const video = config.videos.find((v) => v.id === id);
+  const video = config.videos.find((vid) => vid.id === id);
   if (video) {
     return {
       streams: [{ url: video.url, title: video.title }],
@@ -160,17 +161,68 @@ builder.defineStreamHandler(async ({ type, id }) => {
   return { streams: [] };
 });
 
-// Homepage with link paste
+// Homepage with link styling
 app.get('/', (req, res) => {
   console.log('Serving /');
   res.set('Access-Control-Allow-Origin', '*');
   res.send(`
     <html>
+      <head>
+        <style>
+          body {
+            background-image: url('https://raw.githubusercontent.com/sidh3369/m3u8/main/background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+          }
+          h1, h3 { text-shadow: 2px 2px 4px rgba(0,0,0,0.7); }
+          form {
+            background: rgba(0,0,0,0.6);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+          }
+          input[type="url"] {
+            width: 300px;
+            padding: 10px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 5px;
+          }
+          button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+          }
+          button:hover { background: #0056b3; }
+          p.error { color: #ff4d4d; }
+          p.success { color: #4dff4d; }
+          a {
+            color: #4da8ff;
+            text-decoration: none;
+            margin-top: 10px;
+            display: inline-block;
+          }
+          a:hover { text-decoration: underline; }
+        </style>
+      </head>
       <body>
         <h1>Stremio M3U & Direct Video Addon</h1>
         <h3>Paste M3U Playlist or Direct Video URL</h3>
         <form action="/validate" method="POST">
-          <input type="url" name="url" placeholder="Enter URL" required style="width: 300px;"><br>
+          <input type="url" name="url" placeholder="Enter URL" required><br>
           <button type="submit">Validate Link</button>
         </form>
       </body>
@@ -186,11 +238,62 @@ app.post('/validate', async (req, res) => {
   if (!url) {
     return res.send(`
       <html>
+        <head>
+          <style>
+            body {
+              background-image: url('https://raw.githubusercontent.com/sidh3369/m3u8/main/background.jpg');
+              background-size: cover;
+              background-position: center;
+              background-repeat: no-repeat;
+              color: white;
+              font-family: Arial, sans-serif;
+              text-align: center;
+              min-height: 100vh;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              margin: 0;
+            }
+            h1, h3 { text-shadow: 2px 2px 4px rgba(0,0,0,0.7); }
+            form {
+              background: rgba(0,0,0,0.6);
+              padding: 20px;
+              border-radius: 10px;
+              box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            }
+            input[type="url"] {
+              width: 300px;
+              padding: 10px;
+              margin: 10px 0;
+              border: none;
+              border-radius: 5px;
+            }
+            button {
+              padding: 10px 20px;
+              background: #007bff;
+              color: white;
+              border: none;
+              border-radius: 5px;
+              cursor: pointer;
+            }
+            button:hover { background: #0056b3; }
+            p.error { color: #ff4d4d; }
+            p.success { color: #4dff4d; }
+            a {
+              color: #4da8ff;
+              text-decoration: none;
+              margin-top: 10px;
+              display: inline-block;
+            }
+            a:hover { text-decoration: underline; }
+          </style>
+        </head>
         <body>
           <h1>Stremio M3U & Direct Video Addon</h1>
-          <p style="color: red;">Error: URL is required</p>
+          <p class="error">Error: URL is required</p>
           <form action="/validate" method="POST">
-            <input type="url" name="url" placeholder="Enter URL" required style="width: 300px;"><br>
+            <input type="url" name="url" placeholder="Enter URL" required><br>
             <button type="submit">Validate Link</button>
           </form>
         </body>
@@ -217,6 +320,238 @@ app.post('/validate', async (req, res) => {
     const manifestUrl = `https://m3u-ce5x.onrender.com/addon/manifest.json?url=${encodedUrl}`;
     res.send(`
       <html>
+        <head>
+          <style>
+            body {
+              background-image: url('https://raw.githubusercontent.com/sidh3369/m3u8/main/background.jpg');
+              background-size: cover;
+              background-position: center;
+              background-repeat: no-repeat;
+              color: white;
+              font-family: Arial, sans-serif;
+              text-align: center;
+              min-height: 100vh;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              margin: 0;
+            }
+            h1, h3 { text-shadow: 2px 2px 4px rgba(0,0,0,0.7); }
+            form {
+              background: rgba(0,0,0,0.6);
+              padding: 20px;
+              border-radius: 10px;
+              box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            }
+            input[type="url"] {
+              width: 300px;
+              padding: 10px;
+              margin: 10px 0;
+              border: none;
+              border-radius: 5px;
+            }
+            button {
+              padding: 10px 20px;
+              background: #007bff;
+              color: white;
+              border: none;
+              border-radius: 5px;
+              cursor: pointer;
+            }
+            button:hover { background: #0056b3; }
+            p.error { color: #ff4d4d; }
+            p.success { color: #4dff4d; }
+            a {
+              color: #4da8ff;
+              text-decoration: none;
+              margin-top: 10px;
+              display: inline-block;
+            }
+            a:hover { text-decoration: underline; }
+          </style>
+        </head>
         <body>
           <h1>Stremio M3U & Direct Video Addon</h1>
-          <p style="color:
+          <p class="success">Link is valid (${type === 'm3u' ? 'M3U Playlist' : 'Direct Video'})!</p>
+          <p>URL: ${url}</p>
+          <p>Copy this manifest URL and paste it into Stremio to install:</p>
+          <p><a href="${manifestUrl}">${manifestUrl}</a></p>
+          <br><a href="/dashboard">View Dashboard</a>
+        </body>
+      </html>
+    `);
+  } else {
+    res.send(`
+      <html>
+        <head>
+          <style>
+            body {
+              background-image: url('https://raw.githubusercontent.com/sidh3369/m3u8/main/background.jpg');
+              background-size: cover;
+              background-position: center;
+              background-repeat: no-repeat;
+              color: white;
+              font-family: Arial, sans-serif;
+              text-align: center;
+              min-height: 100vh;
+              display: flex;
+              flex-direction: column;
+              justify-content: center;
+              align-items: center;
+              margin: 0;
+            }
+            h1, h3 { text-shadow: 2px 2px 4px rgba(0,0,0,0.7); }
+            form {
+              background: rgba(0,0,0,0.6);
+              padding: 20px;
+              border-radius: 10px;
+              box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            }
+            input[type="url"] {
+              width: 300px;
+              padding: 10px;
+              margin: 10px 0;
+              border: none;
+              border-radius: 5px;
+            }
+            button {
+              padding: 10px 20px;
+              background: #007bff;
+              color: white;
+              border: none;
+              border-radius: 5px;
+              cursor: pointer;
+            }
+            button:hover { background: #0056b3; }
+            p.error { color: #ff4d4d; }
+            p.success { color: #4dff4d; }
+            a {
+              color: #4da8ff;
+              text-decoration: none;
+              margin-top: 10px;
+              display: inline-block;
+            }
+            a:hover { text-decoration: underline; }
+          </style>
+        </head>
+        <body>
+          <h1>Stremio M3U & Direct Video Addon</h1>
+          <p class="error">Error: Invalid link - ${result.error}</p>
+          <form action="/validate" method="POST">
+            <input type="url" name="url" placeholder="Enter URL" required value="${url}"><br>
+            <button type="submit">Validate Link</button>
+          </form>
+        </body>
+      </html>
+    `);
+  }
+});
+
+// Dashboard endpoint
+app.get('/dashboard', (req, res) => {
+  console.log('Serving /dashboard');
+  res.set('Access-Control-Allow-Origin', '*');
+  const videoList = config.videos
+    .map((v) => `<li>${v.title}: <a href="${v.url}">${v.url}</a></li>`)
+    .join('');
+  res.send(`
+    <html>
+      <head>
+        <style>
+          body {
+            background-image: url('https://raw.githubusercontent.com/sidh3369/m3u8/main/background.jpg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin: 0;
+          }
+          h1, h2 { text-shadow: 2px 2px 4px rgba(0,0,0,0.7); }
+          ul {
+            background: rgba(0,0,0,0.6);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            list-style: none;
+            max-width: 600px;
+          }
+          li { margin: 10px 0; }
+          a {
+            color: #4da8ff;
+            text-decoration: none;
+          }
+          a:hover { text-decoration: underline; }
+        </style>
+      </head>
+      <body>
+        <h1>M3U/Direct Video Dashboard</h1>
+        <p>Configured: ${config.type || 'None'} - ${config.url || 'No URL'}</p>
+        <h2>Videos</h2>
+        <ul>${videoList || '<li>No videos configured</li>'}</ul>
+        <a href="/">Back to Home</a>
+      </body>
+    </html>
+  `);
+});
+
+// Addon routes
+const addonInterface = builder.getInterface();
+app.get('/addon/manifest.json', async (req, res) => {
+  console.log('Serving /addon/manifest.json', req.query);
+  res.set('Access-Control-Allow-Origin', '*');
+  const configUrl = req.query.url || req.query.configUrl;
+  if (configUrl) {
+    const url = decodeURIComponent(configUrl);
+    let result = await validateM3U(url);
+    let type = 'm3u';
+    if (!result.valid) {
+      result = await validateDirect(url);
+      type = 'direct';
+    }
+    if (result.valid) {
+      config.url = url;
+      config.type = type;
+      if (type === 'm3u') {
+        config.videos = await parseM3U(url);
+      } else {
+        config.videos = [{ id: 'direct:1', title: 'Direct Video', url: config.url }];
+      }
+    } else {
+      console.error(`Invalid configUrl: ${url} - ${result.error}`);
+      config.url = null;
+      config.type = null;
+      config.videos = [];
+    }
+  }
+  res.json(addonInterface.manifest);
+});
+
+app.get('/addon/:resource/:type/:id/:extra?.json', async (req, res) => {
+  console.log(`Serving addon route: ${req.path}`);
+  res.set('Access-Control-Allow-Origin', '*');
+  const { resource, type, id } = req.params;
+  try {
+    const response = await addonInterface[resource]({ type, id });
+    res.json(response);
+  } catch (error) {
+    console.error(`Addon error for ${resource}:`, error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Start server
+const PORT = process.env.PORT || 7000;
+app.listen(PORT, () => {
+  console.log(`Addon server running on port ${PORT}`);
+  console.log(`Access home: http://localhost:${PORT}/`);
+  console.log(`Access dashboard: http://localhost:${PORT}/dashboard`);
+  console.log(`Install in Stremio: http://localhost:${PORT}/addon/manifest.json`);
+});
